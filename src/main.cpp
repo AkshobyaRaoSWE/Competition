@@ -54,11 +54,12 @@ pros::Rotation yOdom(7);
 lemlib::TrackingWheel horizontal_tracking_wheel(&xOdom, lemlib::Omniwheel::NEW_275, -5.75);
 lemlib::TrackingWheel vertical_tracking_wheel(&yOdom, lemlib::Omniwheel::NEW_275, -2.5);
 
-lemlib::OdomSensors sensors(&vertical_tracking_wheel, // vertical tracking wheel 1, set to null
-                            nullptr, // vertical tracking wheel 2, set to nullptr as we are using IMEs
-                            &horizontal_tracking_wheel, // horizontal tracking wheel 1
-                            nullptr, // horizontal tracking wheel 2, set to nullptr as we don't have a second one
-                            &imu // inertial sensor
+lemlib::OdomSensors sensors(
+    &vertical_tracking_wheel, // vertical tracking wheel 1, set to null
+    nullptr, // vertical tracking wheel 2, set to nullptr as we are using IMEs
+    &horizontal_tracking_wheel, // horizontal tracking wheel 1
+    nullptr, // horizontal tracking wheel 2, set to nullptr as we don't have a second one
+    &imu // inertial sensor
 );
 
 

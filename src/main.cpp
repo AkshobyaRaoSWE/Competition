@@ -9,8 +9,13 @@
 2) setup odom sensors/test via print to brain screen;
 3) PID tune; 
 4) experiment with tank drive; 
-5) auton selector; 
+5) auton selector(commented out for now) -> NOT RIGHT NOW
 */
+
+
+bool FIRST = true;
+bool SECOND = false;
+bool THIRD = false;
 
 
 // Controller
@@ -42,12 +47,12 @@ lemlib::Drivetrain drivetrain(
 
 
 // sensors
-pros::Imu imu(10);
+pros::Imu imu(10); // degrees/turning
 
-//? Odom Setup
+//? Odom Setup // check if reversed by moving the robot, if its opposite, then reversed
 
-pros::Rotation xOdom(6);
-pros::Rotation yOdom(7);
+pros::Rotation xOdom(6); // x pos place on left or right sides at base of dt
+pros::Rotation yOdom(7); // y pos place on front or back of dt
 
 //! Need to adjust offsets -> Distance from Center of wheel to center of tracking wheel(left - neg; right - pos)
 
@@ -63,7 +68,9 @@ lemlib::OdomSensors sensors(
 );
 
 
-// PID
+// PID(After you tune, everything should work as expect, if not look at the printscreens to see if the robot thinks its getting to such positions, if so, then its likely a PID tuning issue, will take sometime but you have time)
+// Do default, set 0, slowly adjust each factor, 
+// at the end, should have smooth motions
 
 // TODO: Tune PID again with new sensors
 
@@ -99,7 +106,6 @@ lemlib::Chassis chassis(drivetrain, // drivetrain settings
                         sensors // odometry sensors
 );
 
-
 //? Random code ->
 
 void on_center_button() {
@@ -125,7 +131,7 @@ void initialize() {
     chassis.calibrate(); // Calibrate the chassis to reset odometry
 	pros::delay(200);
 
-	pros::lcd::print(1, "Calibration Complete 🍎 Skib");
+	pros::lcd::print(1, "Calibration Complete 🍎 Sigma");
 
 
 	pros::Task screen_task([&]() {
@@ -144,10 +150,8 @@ void disabled() {} // NOT NEEDED!!!
 void competition_initialize() {} // NOT NEEDED!
 
 void autonomous() {
-	// Setting everything to 0,0,0
 	imu.set_heading(0);
 	chassis.setPose(0,0,0);
-
 
 	// Below code should move robot to point 0,20 in a straight line, with the most amount of time it can move for is 10000 ms
 	chassis.moveToPose(0, 20, 0, 10000);
@@ -156,10 +160,23 @@ void autonomous() {
 
 void opcontrol() {
 	while (true) {
+        // TODO: Try tank drive;
+
+        // movement
 		int leftY = master.get_analog(ANALOG_LEFT_Y);
 		int rightY = master.get_analog(ANALOG_RIGHT_Y);
 		left_mg.move(leftY);
 		right_mg.move(rightY);
 		pros::delay(20); // Run for 20 ms then update
+
+        // Mogo Clamp
+
+        // Doinker
+
+        // Intake
+
+        // Lady Brown
+        
+
 	}
 }

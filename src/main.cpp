@@ -13,23 +13,23 @@
 */
 
 
-bool FIRST = true;
-bool SECOND = false;
-bool THIRD = false;
+bool firstPos = true;
+bool secondPos = false;
+bool thirdPos = false;
 
 
 // Controller
 pros::Controller master(pros::E_CONTROLLER_MASTER); //! SIGMA CONTROLLER 🤖
-lemlib::ExpoDriveCurve driveCurve(5, 12, 1.132);
+lemlib::ExpoDriveCurve driveCurve(3, 10, 1.019);
 
 // Motor Groups
 pros::MotorGroup left_mg({-1, -2, -3}, pros::MotorGearset::blue);    
 pros::MotorGroup right_mg({5, 11, 8}, pros::MotorGearset::blue); 
 
 // Single Motors
-pros::Motor flexwheel(18);
-pros::Motor chain(15);
-pros::Motor ladyBrown(21);
+pros::Motor flexwheel(18, pros::MotorGearset::green);
+pros::Motor chain(15, pros::MotorGearset::blue);
+pros::Motor ladyBrown(21, pros::MotorGearset::green);
 
 // Solenoids
 pros::adi::Pneumatics mogo('A', false);
@@ -40,7 +40,7 @@ lemlib::Drivetrain drivetrain(
 	&left_mg, // left motor group
     &right_mg, // right motor group
     11.25, // 11.25 inch track width
-	lemlib::Omniwheel::NEW_325, // using new 3.25" omnis
+	lemlib::Omniwheel::NEW_325, // using new 3.25" omnis //! Check wheel size
     450, // drivetrain rpm is 450
     2 // horizontal drift is 2 (for now)
 );
@@ -51,18 +51,20 @@ pros::Imu imu(10); // degrees/turning
 
 //? Odom Setup // check if reversed by moving the robot, if its opposite, then reversed
 
-pros::Rotation xOdom(6); // x pos place on left or right sides at base of dt
-pros::Rotation yOdom(7); // y pos place on front or back of dt
+// pros::Rotation xOdom(6); // x pos place on left or right sides at base of dt
+pros::Rotation yOdom(-7); // y pos place on front or back of dt
+// pros::Rotation ladyOdom(9); // y pos place on front or back of dt
 
-//! Need to adjust offsets -> Distance from Center of wheel to center of tracking wheel(left - neg; right - pos)
+//! Need to adjust offsets -> Distance from Center of wheel to center of tracking wheel(left -> neg; right -> pos)
 
-lemlib::TrackingWheel horizontal_tracking_wheel(&xOdom, lemlib::Omniwheel::NEW_275, -5.75);
-lemlib::TrackingWheel vertical_tracking_wheel(&yOdom, lemlib::Omniwheel::NEW_275, -2.5);
+// lemlib::TrackingWheel horizontal_tracking_wheel(&xOdom, lemlib::Omniwheel::NEW_275, -5.75);
+lemlib::TrackingWheel vertical_tracking_wheel(&yOdom, lemlib::Omniwheel::NEW_2, -2.5); //! offset
+// lemlib::TrackingWheel lady_tracking_wheel(&yOdom, lemlib::Omniwheel::NEW_275, -2.5);
 
 lemlib::OdomSensors sensors(
     &vertical_tracking_wheel, // vertical tracking wheel 1, set to null
     nullptr, // vertical tracking wheel 2, set to nullptr as we are using IMEs
-    &horizontal_tracking_wheel, // horizontal tracking wheel 1
+    nullptr, // horizontal tracking wheel 1
     nullptr, // horizontal tracking wheel 2, set to nullptr as we don't have a second one
     &imu // inertial sensor
 );
@@ -100,10 +102,13 @@ lemlib::ControllerSettings angular_controller(
 );
 
 // create the chassis
-lemlib::Chassis chassis(drivetrain, // drivetrain settings
-                        lateral_controller, // lateral PID settings
-                        angular_controller, // angular PID settings
-                        sensors // odometry sensors
+lemlib::Chassis chassis(
+    drivetrain, // drivetrain settings
+    lateral_controller, // lateral PID settings
+    angular_controller, // angular PID settings
+    sensors, // odometry sensors
+    &driveCurve,
+    &driveCurve
 );
 
 //? Random code ->
@@ -124,12 +129,12 @@ void initialize() {
 	imu.set_heading(0); // Set IMU heading to 0 for reference
     pros::delay(100); // Optional delay for IMU calibration
 
-    xOdom.reset_position(); // Reset X odom sensor
+    // xOdom.reset_position(); // Reset X odom sensor
     yOdom.reset_position(); // Reset Y odom sensor
 	pros::delay(100); // Optional delay for IMU calibration
 
     chassis.calibrate(); // Calibrate the chassis to reset odometry
-	pros::delay(200);
+	pros::delay(500);
 
 	pros::lcd::print(1, "Calibration Complete 🍎 Sigma");
 
@@ -150,32 +155,99 @@ void disabled() {} // NOT NEEDED!!!
 void competition_initialize() {} // NOT NEEDED!
 
 void autonomous() {
+    // yOdom.reset_position();
+    // chassis.calibrate(); // Calibrate the chassis to reset odometry
 	imu.set_heading(0);
-	chassis.setPose(0,0,0);
+	chassis.setPose(0,0,180);
 
-	// Below code should move robot to point 0,20 in a straight line, with the most amount of time it can move for is 10000 ms
-	chassis.moveToPose(0, 20, 0, 10000);
+
+	// Below code should move robot to point 20" in a straight line, with the most amount of time it can move for is 10000 ms(complete action in that time)
+	chassis.moveToPoint(0, 33, 4000, {.forwards=false, .maxSpeed=85});
+    pros::delay(800);
+    mogo.extend();
+    chain.move(200);
+    pros::delay(400);
+    flexwheel.move(200);
+    chassis.turnToHeading(275,4000);
+    yOdom.reset_position(); // Reset Y odom sensor
+	imu.set_heading(0);
+    chassis.setPose(0,0,275);
+    chassis.moveToPoint(0, 25, 4000, {.forwards=true, .maxSpeed=85});
+    chassis.waitUntilDone();
+    flexwheel.move(0);
+    chain.move(0);
+    // EXAMPLE
+
+    // chassis.moveToPose(
+    //     48,
+    //     -24,
+    //     90,
+    //     2000,
+    //     {.minSpeed=72, .earlyExitRange=8}
+    // );
 
 } 
 
 void opcontrol() {
 	while (true) {
-        // TODO: Try tank drive;
 
         // movement
 		int leftY = master.get_analog(ANALOG_LEFT_Y);
 		int rightY = master.get_analog(ANALOG_RIGHT_Y);
 		left_mg.move(leftY);
 		right_mg.move(rightY);
+
 		pros::delay(20); // Run for 20 ms then update
 
-        // Mogo Clamp
+        //! Mogo Clamp
+        if(master.get_digital(DIGITAL_B)){
+            mogo.extend();
+        } else if(master.get_digital(DIGITAL_DOWN)){
+            mogo.retract();
+        }
 
-        // Doinker
 
-        // Intake
+        //! Doinker;
+        if(master.get_digital(DIGITAL_L2)){
+            doinker.set_value(true);
+        } else {
+            doinker.set_value(false);
+        }
 
-        // Lady Brown
+
+        //! Intake
+        if(master.get_digital(DIGITAL_R1)){
+            chain.move(400);
+            flexwheel.move(400);
+        } else if(master.get_digital(DIGITAL_R2)){
+            chain.move(400);
+            flexwheel.move(400);
+        } else{
+            chain.move(0);
+            flexwheel.move(0);
+        }
+
+        //! Lady Brown
+        if(master.get_digital(DIGITAL_L1)) {
+            if(firstPos == true && secondPos == false && thirdPos == false){
+                    ladyBrown.move_absolute(390, 200);
+                    firstPos = false;
+                    secondPos = true;
+                    thirdPos = false;
+            } 
+            else if(firstPos == false && secondPos == true && thirdPos == false){
+                    ladyBrown.move_absolute(1600, 200);
+                    firstPos = false;
+                    secondPos = false;
+                    thirdPos = true;
+            }
+            else if(firstPos == false && secondPos == false && thirdPos == true){
+                    ladyBrown.move_absolute(0, 250);
+                    firstPos = true;
+                    secondPos = false;
+                    thirdPos = false;
+            }   
+        }
         
 
 	}

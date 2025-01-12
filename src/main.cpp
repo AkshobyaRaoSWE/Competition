@@ -4,15 +4,6 @@
 #include "lemlib/api.hpp"
 
 
-/* TODO: 
-1) make all basic funtionalities; 
-2) setup odom sensors/test via print to brain screen;
-3) PID tune; 
-4) experiment with tank drive; 
-5) auton selector(commented out for now) -> NOT RIGHT NOW
-*/
-
-
 bool firstPos = true;
 bool secondPos = false;
 bool thirdPos = false;
@@ -48,8 +39,9 @@ lemlib::Drivetrain drivetrain(
 
 // sensors
 pros::Imu imu(10); // degrees/turning
+pros::Distance distance_sensor(6);  // Assuming it's connected to port 1
 
-//? Odom Setup // check if reversed by moving the robot, if its opposite, then reversed
+
 
 // pros::Rotation xOdom(6); // x pos place on left or right sides at base of dt
 pros::Rotation yOdom(-7); // y pos place on front or back of dt
@@ -157,6 +149,7 @@ void competition_initialize() {} // NOT NEEDED!
 void autonomous() {
     // yOdom.reset_position();
     // chassis.calibrate(); // Calibrate the chassis to reset odometry
+
 	imu.set_heading(0);
 	chassis.setPose(0,0,180);
 
@@ -169,15 +162,9 @@ void autonomous() {
     pros::delay(400);
     flexwheel.move(200);
     chassis.turnToHeading(275,4000);
-    yOdom.reset_position(); // Reset Y odom sensor
-	imu.set_heading(0);
-    chassis.setPose(0,0,275);
-    chassis.moveToPoint(0, 25, 4000, {.forwards=true, .maxSpeed=85});
-    chassis.waitUntilDone();
-    flexwheel.move(0);
-    chain.move(0);
-    // EXAMPLE
 
+
+    // EXAMPLE
     // chassis.moveToPose(
     //     48,
     //     -24,
@@ -197,6 +184,9 @@ void opcontrol() {
 		left_mg.move(leftY);
 		right_mg.move(rightY);
 
+        int sensor_value = distance_sensor.get_distance();
+
+
 		pros::delay(20); // Run for 20 ms then update
 
         //! Mogo Clamp
@@ -206,9 +196,19 @@ void opcontrol() {
             mogo.retract();
         }
 
+        if(master.get_digital(DIGITAL_RIGHT)){
+            if(sensor_value < 10.0){
+                pros::delay(10);
+                chain.move(-400);
+                flexwheel.move(-400);
+                pros::delay(800);  // Delay for 500ms (duration of the outtake)
+                chain.move(0);
+                flexwheel.move(0);
+            }
+        }
 
         //! Doinker;
-        if(master.get_digital(DIGITAL_L2)){
+        if(master.get_digital(DIGITAL_L1)){
             doinker.set_value(true);
         } else {
             doinker.set_value(false);
@@ -220,15 +220,15 @@ void opcontrol() {
             chain.move(400);
             flexwheel.move(400);
         } else if(master.get_digital(DIGITAL_R2)){
-            chain.move(400);
-            flexwheel.move(400);
+            chain.move(-400);
+            flexwheel.move(-400);
         } else{
             chain.move(0);
             flexwheel.move(0);
         }
 
         //! Lady Brown
-        if(master.get_digital(DIGITAL_L1)) {
+        if(master.get_digital(DIGITAL_L2)) {
             if(firstPos == true && secondPos == false && thirdPos == false){
                     ladyBrown.move_absolute(390, 200);
                     firstPos = false;

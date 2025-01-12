@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "Competition",
+    "project_name": "COMPETITION",
     "target": "v5",
     "templates": {
       "LemLib": {
@@ -299,7 +299,8 @@
     },
     "upload_options": {
       "description": "AKSHOBYA RAO",
-      "icon": "alien"
+      "icon": "X",
+      "slot": 1
     },
     "use_early_access": false
   }

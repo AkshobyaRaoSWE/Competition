@@ -1,4 +1,5 @@
 #include "main.h"
+#include "lemlib/chassis/chassis.hpp"
 #include "pros/misc.h"
 #include "pros/motors.hpp"
 #include "lemlib/api.hpp"
@@ -14,13 +15,13 @@ pros::Controller master(pros::E_CONTROLLER_MASTER); //! SIGMA CONTROLLER 🤖
 lemlib::ExpoDriveCurve driveCurve(3, 10, 1.019);
 
 // Motor Groups
-pros::MotorGroup left_mg({-1, -2, -3}, pros::MotorGearset::blue);    
-pros::MotorGroup right_mg({5, 11, 8}, pros::MotorGearset::blue); 
+pros::MotorGroup left_mg({-19, -18, -17}, pros::MotorGearset::blue);    
+pros::MotorGroup right_mg({12, 13, 14}, pros::MotorGearset::blue); 
 
 // Single Motors
-pros::Motor flexwheel(18, pros::MotorGearset::green);
-pros::Motor chain(15, pros::MotorGearset::blue);
-pros::Motor ladyBrown(21, pros::MotorGearset::green);
+pros::Motor flexwheel(20, pros::MotorGearset::green);
+pros::Motor chain(11, pros::MotorGearset::blue);
+pros::Motor ladyBrown(8, pros::MotorGearset::green);
 
 // Solenoids
 pros::adi::Pneumatics mogo('A', false);
@@ -38,14 +39,14 @@ lemlib::Drivetrain drivetrain(
 
 
 // sensors
-pros::Imu imu(10); // degrees/turning
-pros::Distance distance_sensor(6);  // Assuming it's connected to port 1
+pros::Imu imu(15); // degrees/turning
+pros::Distance distance_sensor(9);  // Assuming it's connected to port 1
 
 
 
 // pros::Rotation xOdom(6); // x pos place on left or right sides at base of dt
-pros::Rotation yOdom(-7); // y pos place on front or back of dt
-// pros::Rotation ladyOdom(9); // y pos place on front or back of dt
+pros::Rotation yOdom(-16); // y pos place on front or back of dt
+pros::Rotation ladyOdom(9); // y pos place on front or back of dt
 
 //! Need to adjust offsets -> Distance from Center of wheel to center of tracking wheel(left -> neg; right -> pos)
 
@@ -106,13 +107,17 @@ lemlib::Chassis chassis(
 //? Random code ->
 
 void on_center_button() {
-	static bool pressed = false;
-	pressed = !pressed;
-	if (pressed) {
-		pros::lcd::set_text(2, "I was pressed!");
-	} else {
-		pros::lcd::clear_line(2);
-	}
+	// static bool pressed = false;
+    // pressed = !pressed;
+    // if (pressed) {
+    //     if (selectedSide == BLUE_RIGHT) {
+    //         selectedSide = RED_LEFT;
+    //         pros::lcd::set_text(2, "Selected: Red Left");
+    //     } else {
+    //         selectedSide = BLUE_RIGHT;
+    //         pros::lcd::set_text(2, "Selected: Blue Right");
+    //     }
+    // }
 }
 
 void initialize() {
@@ -123,6 +128,7 @@ void initialize() {
 
     // xOdom.reset_position(); // Reset X odom sensor
     yOdom.reset_position(); // Reset Y odom sensor
+    ladyOdom.reset_position();
 	pros::delay(100); // Optional delay for IMU calibration
 
     chassis.calibrate(); // Calibrate the chassis to reset odometry
@@ -152,27 +158,40 @@ void autonomous() {
 
 	imu.set_heading(0);
 	chassis.setPose(0,0,180);
-
-
-	// Below code should move robot to point 20" in a straight line, with the most amount of time it can move for is 10000 ms(complete action in that time)
-	chassis.moveToPoint(0, 33, 4000, {.forwards=false, .maxSpeed=85});
+    // Below code should move robot to point 20" in a straight line, with the most amount of time it can move for is 10000 ms(complete action in that time)
+    chassis.moveToPoint(0, 33, 2000, {.forwards=false, .maxSpeed=85});
     pros::delay(800);
     mogo.extend();
     chain.move(200);
     pros::delay(400);
     flexwheel.move(200);
-    chassis.turnToHeading(275,4000);
-
-
-    // EXAMPLE
-    // chassis.moveToPose(
-    //     48,
-    //     -24,
-    //     90,
-    //     2000,
-    //     {.minSpeed=72, .earlyExitRange=8}
-    // );
-
+    chassis.turnToHeading(280,700);
+    chassis.waitUntilDone();
+    chassis.setPose(0,0,0);
+    chassis.waitUntilDone();
+    chassis.moveToPoint(0, 19, 3000, {.forwards=true, .maxSpeed=85});
+    chassis.waitUntilDone();
+    chassis.turnToHeading(80, 600);
+    chassis.waitUntilDone();
+    chassis.setPose(0,0,0);
+    chassis.waitUntilDone();
+    chassis.moveToPoint(0, 9, 1000, {.forwards=true, .maxSpeed=85});
+    chassis.waitUntilDone();
+    // chassis.setPose(0,0,0);
+    // chassis.waitUntilDone();    
+    chassis.moveToPoint(0, -5, 600, {.forwards=false, .maxSpeed=85});
+    chassis.turnToHeading(330, 500);    
+    chassis.waitUntilDone();
+    chassis.setPose(0,0,0);
+    chassis.waitUntilDone();
+    chassis.moveToPoint(0, 16, 1300, {.forwards=true, .maxSpeed=85});
+    pros::delay(2500);
+    chassis.moveToPoint(0, -18, 1300, {.forwards=false, .maxSpeed=85});
+    chassis.turnToHeading(250, 500);
+    chassis.waitUntilDone();
+    chassis.setPose(0,0,0);
+    chassis.waitUntilDone();
+    chassis.moveToPoint(0, 28, 3000, {.forwards=true, .maxSpeed=65});
 } 
 
 void opcontrol() {
@@ -236,7 +255,7 @@ void opcontrol() {
                     thirdPos = false;
             } 
             else if(firstPos == false && secondPos == true && thirdPos == false){
-                    ladyBrown.move_absolute(1600, 200);
+                    ladyBrown.move_absolute(1800, 200);
                     firstPos = false;
                     secondPos = false;
                     thirdPos = true;

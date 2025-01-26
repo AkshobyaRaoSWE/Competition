@@ -5,61 +5,66 @@
 #include "lemlib/api.hpp"
 
 
-bool firstPos = true;
-bool secondPos = false;
-bool thirdPos = false;
+
+/*
+1. Reattach odom sensors, upload code, run driver control, see if any sensors are flipped and all are connected to proper/working ports and if they are all working properly
+2. If they aren't try running the same code for blue right or your prior repos, which haven't been changed
+3. Measure offset of tracking wheel
+4. Test auton
+5. Tune pid
+6. Test lady brown odom, see if its printing proper brian values
+7. test lady brown
+8. check wheel sizes, rpm, etc.
+9. check if brain is working
+ */
 
 
-// Controller
-pros::Controller master(pros::E_CONTROLLER_MASTER); //! SIGMA CONTROLLER 🤖
+
+int positionState = 0;
+const int numStates = 3;
+int states[numStates] = {0, 27, 150};
+int currState = 0;
+int target = 0;
+
+pros::Controller master(pros::E_CONTROLLER_MASTER); 
 lemlib::ExpoDriveCurve driveCurve(3, 10, 1.019);
 
-// Motor Groups
 pros::MotorGroup left_mg({-19, -18, -17}, pros::MotorGearset::blue);    
 pros::MotorGroup right_mg({12, 13, 14}, pros::MotorGearset::blue); 
 
-// Single Motors
 pros::Motor flexwheel(20, pros::MotorGearset::green);
 pros::Motor chain(11, pros::MotorGearset::blue);
-pros::Motor ladyBrown(8, pros::MotorGearset::green);
+pros::Motor lb(8, pros::MotorGearset::green);
 
-// Solenoids
 pros::adi::Pneumatics mogo('A', false);
-pros::adi::Pneumatics doinker('B', false); //? IT DOINKS!!!!
+pros::adi::Pneumatics doinker('B', false); 
 
-// Drivetrain
 lemlib::Drivetrain drivetrain(
-	&left_mg, // left motor group
-    &right_mg, // right motor group
-    11.25, // 11.25 inch track width
-	lemlib::Omniwheel::NEW_325, // using new 3.25" omnis //! Check wheel size
-    450, // drivetrain rpm is 450
-    2 // horizontal drift is 2 (for now)
+	&left_mg,
+    &right_mg,
+    11.25,
+	lemlib::Omniwheel::NEW_325,
+    450, 
+    2
 );
 
+//! Make sure you test both odom sensors, imu sensor after adding the sensors
+pros::Imu imu(16); 
+pros::Distance distance_sensor(9);
 
-// sensors
-pros::Imu imu(15); // degrees/turning
-pros::Distance distance_sensor(9);  // Assuming it's connected to port 1
+//! Make sure you test both odom sensors, imu sensor after adding the sensors(test both ports to see if they are reversed)
+pros::Rotation yOdom(15); 
+pros::Rotation ladyOdom(21); 
 
 
-
-// pros::Rotation xOdom(6); // x pos place on left or right sides at base of dt
-pros::Rotation yOdom(-16); // y pos place on front or back of dt
-pros::Rotation ladyOdom(9); // y pos place on front or back of dt
-
-//! Need to adjust offsets -> Distance from Center of wheel to center of tracking wheel(left -> neg; right -> pos)
-
-// lemlib::TrackingWheel horizontal_tracking_wheel(&xOdom, lemlib::Omniwheel::NEW_275, -5.75);
-lemlib::TrackingWheel vertical_tracking_wheel(&yOdom, lemlib::Omniwheel::NEW_2, -2.5); //! offset
-// lemlib::TrackingWheel lady_tracking_wheel(&yOdom, lemlib::Omniwheel::NEW_275, -2.5);
+lemlib::TrackingWheel vertical_tracking_wheel(&yOdom, lemlib::Omniwheel::NEW_2, -2.5); //! Measure offset
 
 lemlib::OdomSensors sensors(
-    &vertical_tracking_wheel, // vertical tracking wheel 1, set to null
-    nullptr, // vertical tracking wheel 2, set to nullptr as we are using IMEs
-    nullptr, // horizontal tracking wheel 1
-    nullptr, // horizontal tracking wheel 2, set to nullptr as we don't have a second one
-    &imu // inertial sensor
+    &vertical_tracking_wheel, 
+    nullptr,
+    nullptr,
+    nullptr,
+    &imu
 );
 
 
@@ -67,12 +72,11 @@ lemlib::OdomSensors sensors(
 // Do default, set 0, slowly adjust each factor, 
 // at the end, should have smooth motions
 
-// TODO: Tune PID again with new sensors
 
 lemlib::ControllerSettings lateral_controller(
-	10, // proportional gain (kP)
-    0, // integral gain (kI)
-    3, // derivative gain (kD)
+	10, // (kP)
+    0, // (kI)
+    3, // (kD)
     3, // anti windup
     1, // small error range, in inches
 	100, // small error range timeout, in milliseconds
@@ -81,11 +85,10 @@ lemlib::ControllerSettings lateral_controller(
     20 // maximum acceleration (slew)
 );
 
-
 lemlib::ControllerSettings angular_controller(
-	2, // proportional gain (kP)
-	0, // integral gain (kI)
-    10, // derivative gain (kD)
+	2, // (kP)
+	0, // (kI)
+    10, // (kD)
 	3, // anti windup
     1, // small error range, in degrees
     100, // small error range timeout, in milliseconds
@@ -96,54 +99,65 @@ lemlib::ControllerSettings angular_controller(
 
 // create the chassis
 lemlib::Chassis chassis(
-    drivetrain, // drivetrain settings
-    lateral_controller, // lateral PID settings
-    angular_controller, // angular PID settings
-    sensors, // odometry sensors
+    drivetrain, 
+    lateral_controller,
+    angular_controller, 
+    sensors, 
     &driveCurve,
     &driveCurve
 );
 
-//? Random code ->
-
-void on_center_button() {
-	// static bool pressed = false;
-    // pressed = !pressed;
-    // if (pressed) {
-    //     if (selectedSide == BLUE_RIGHT) {
-    //         selectedSide = RED_LEFT;
-    //         pros::lcd::set_text(2, "Selected: Red Left");
-    //     } else {
-    //         selectedSide = BLUE_RIGHT;
-    //         pros::lcd::set_text(2, "Selected: Blue Right");
-    //     }
-    // }
+void nextState(){
+    currState += 1;
+    if(currState == 3){
+        currState = 0;
+    }
+    target = states[currState];
 }
+
+void liftControl(){
+    double kp = 3;
+    double err = target - (ladyOdom.get_position()/100.0);
+    double velocity = kp * err;
+    lb.move(velocity);
+}
+
+
+void on_center_button() {}
 
 void initialize() {
 	pros::lcd::initialize();
-    // calibrate sensors
-	imu.set_heading(0); // Set IMU heading to 0 for reference
-    pros::delay(100); // Optional delay for IMU calibration
+	imu.set_heading(0);
+    pros::delay(100);
 
-    // xOdom.reset_position(); // Reset X odom sensor
-    yOdom.reset_position(); // Reset Y odom sensor
+    yOdom.reset_position(); 
     ladyOdom.reset_position();
-	pros::delay(100); // Optional delay for IMU calibration
+	pros::delay(100);
 
-    chassis.calibrate(); // Calibrate the chassis to reset odometry
+    chassis.calibrate();
 	pros::delay(500);
 
-	pros::lcd::print(1, "Calibration Complete 🍎 Sigma");
+	pros::lcd::print(1, "Calibration Complete");
 
+    //! Copy THis ->
 
 	pros::Task screen_task([&]() {
         while (true) {
-            // print robot location to the brain screen
             pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
             pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
             pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
+            pros::lcd::print(3, "lb: %f", ladyOdom.get_position()/100.0); // heading
             pros::delay(20);
+        }
+    });
+    //!_________________________
+
+
+    
+    pros::Task liftControlTask([]{
+        while(true){
+            liftControl();
+            pros::delay(10);
         }
     });
 }
@@ -153,45 +167,59 @@ void disabled() {} // NOT NEEDED!!!
 void competition_initialize() {} // NOT NEEDED!
 
 void autonomous() {
-    // yOdom.reset_position();
-    // chassis.calibrate(); // Calibrate the chassis to reset odometry
-
 	imu.set_heading(0);
 	chassis.setPose(0,0,180);
-    // Below code should move robot to point 20" in a straight line, with the most amount of time it can move for is 10000 ms(complete action in that time)
+
+    //mogo
     chassis.moveToPoint(0, 33, 2000, {.forwards=false, .maxSpeed=85});
     pros::delay(800);
     mogo.extend();
     chain.move(200);
     pros::delay(400);
     flexwheel.move(200);
+
+    //ring 0
     chassis.turnToHeading(280,700);
     chassis.waitUntilDone();
     chassis.setPose(0,0,0);
     chassis.waitUntilDone();
     chassis.moveToPoint(0, 19, 3000, {.forwards=true, .maxSpeed=85});
     chassis.waitUntilDone();
+
+    //ring 1
     chassis.turnToHeading(80, 600);
     chassis.waitUntilDone();
     chassis.setPose(0,0,0);
     chassis.waitUntilDone();
-    chassis.moveToPoint(0, 9, 1000, {.forwards=true, .maxSpeed=85});
+    chassis.moveToPoint(0, 11, 1000, {.forwards=true, .maxSpeed=85});
     chassis.waitUntilDone();
+    pros::delay(200); 
+    chassis.moveToPoint(0, -7, 600, {.forwards=false, .maxSpeed=85});
+
+    //ring 2
+    chassis.turnToHeading(340, 500);    
+    chassis.waitUntilDone();
+    chassis.setPose(0,0,0);
+    chassis.waitUntilDone();
+    chassis.moveToPoint(0, 18, 1300, {.forwards=true, .maxSpeed=85});
+    pros::delay(1000);
+    chassis.moveToPoint(0, -16.5, 1300, {.forwards=false, .maxSpeed=85});
+    mogo.retract();
+    chassis.waitUntilDone();
+    chassis.turnToHeading(105,5000);
+    chassis.waitUntilDone();
+    chassis.setPose(0,0,0);
+    chassis.moveToPoint(0, 45.5, 1000, {.forwards=true, .maxSpeed=65});
+    pros::delay(900);
+    chain.move(0);
+
+
+    // //ring 3
+    // chassis.turnToHeading(250, 500);
+    // chassis.waitUntilDone();
     // chassis.setPose(0,0,0);
-    // chassis.waitUntilDone();    
-    chassis.moveToPoint(0, -5, 600, {.forwards=false, .maxSpeed=85});
-    chassis.turnToHeading(330, 500);    
-    chassis.waitUntilDone();
-    chassis.setPose(0,0,0);
-    chassis.waitUntilDone();
-    chassis.moveToPoint(0, 16, 1300, {.forwards=true, .maxSpeed=85});
-    pros::delay(2500);
-    chassis.moveToPoint(0, -18, 1300, {.forwards=false, .maxSpeed=85});
-    chassis.turnToHeading(250, 500);
-    chassis.waitUntilDone();
-    chassis.setPose(0,0,0);
-    chassis.waitUntilDone();
-    chassis.moveToPoint(0, 28, 3000, {.forwards=true, .maxSpeed=65});
+    // chassis.waitUntilDone();
+    // chassis.moveToPoint(0, 28, 3000, {.forwards=true, .maxSpeed=65});
 } 
 
 void opcontrol() {
@@ -204,8 +232,6 @@ void opcontrol() {
 		right_mg.move(rightY);
 
         int sensor_value = distance_sensor.get_distance();
-
-
 		pros::delay(20); // Run for 20 ms then update
 
         //! Mogo Clamp
@@ -215,9 +241,10 @@ void opcontrol() {
             mogo.retract();
         }
 
+
+        //! Digital Sensor
         if(master.get_digital(DIGITAL_RIGHT)){
             if(sensor_value < 10.0){
-                pros::delay(10);
                 chain.move(-400);
                 flexwheel.move(-400);
                 pros::delay(800);  // Delay for 500ms (duration of the outtake)
@@ -226,7 +253,7 @@ void opcontrol() {
             }
         }
 
-        //! Doinker;
+        //! Doinker
         if(master.get_digital(DIGITAL_L1)){
             doinker.set_value(true);
         } else {
@@ -247,27 +274,8 @@ void opcontrol() {
         }
 
         //! Lady Brown
-        if(master.get_digital(DIGITAL_L2)) {
-            if(firstPos == true && secondPos == false && thirdPos == false){
-                    ladyBrown.move_absolute(390, 200);
-                    firstPos = false;
-                    secondPos = true;
-                    thirdPos = false;
-            } 
-            else if(firstPos == false && secondPos == true && thirdPos == false){
-                    ladyBrown.move_absolute(1800, 200);
-                    firstPos = false;
-                    secondPos = false;
-                    thirdPos = true;
-            }
-            else if(firstPos == false && secondPos == false && thirdPos == true){
-                    ladyBrown.move_absolute(0, 250);
-                    firstPos = true;
-                    secondPos = false;
-                    thirdPos = false;
-            }   
+        if(master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L2)){
+            nextState();
         }
-        
-
 	}
 }
